@@ -47,7 +47,7 @@ All flags can be combined.
 
 ## Obtaining google credentials
 
-In order to use the Google sheets API you must first obtain the necessary credentials. [This guy][https://www.youtube.com/watch?v=cnplklegr7e&t=338s] explains it pretty well, but I'll also explain in textually here.
+In order to use the Google sheets API you must first obtain the necessary credentials. [This guy](https://www.youtube.com/watch?v=cnplklegr7e&t=338s) explains it pretty well, but I'll also explain in textually here.
 
 1. Go to console.cloud.google.com
 2. Create a new project. Name it anything you want, no organization.
