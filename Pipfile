@@ -12,6 +12,7 @@ gspread = "*"
 oauth2client = "*"
 beautifulsoup4 = "*"
 jupyterlab = "*"
+tqdm = "*"
 
 [requires]
 python_version = "3.8"

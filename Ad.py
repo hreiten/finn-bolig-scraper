@@ -23,19 +23,10 @@ class Scraper:
         self.body = self.soup.find(
             body_tag, {"class": body_class}) if body_class else self.soup.find(body_tag)
 
-    def get_value_for_label(self, label, label_container_tag="dl"):
-        for tags in self.body.findAll(label_container_tag):
-            found_label = tags.find(text=label) is not None
-
-            if found_label:
-                children = list(filter(lambda x: x != '\n', tags.children))
-                for i, child in enumerate(children):
-                    try:
-                        if child.text == label:
-                            return fmt_value(children[i+1].text)
-                            break
-                    except:
-                        continue
+    def find_by_value(self, label, tag):
+        label_tag = self.body.find(tag, text=label)
+        if label_tag:
+            return fmt_value(label_tag.next_sibling.next_sibling.text.strip())
 
 
 class Ad:
@@ -58,15 +49,16 @@ class Ad:
     forrige_salg_pris = None
     bud = None
     solgt = None
+    finn_id = None
     kommentar = ""
 
     def __init__(self, uri):
         self.uri = uri
-        self.ad_id = int(uri.split("=")[-1].strip())
+        self.finn_id = int(uri.split("=")[-1].strip())
         self.scrape_info()
 
     def get_prev_sales_uri(self):
-        return f'https://www.finn.no/realestate/ownershiphistory.html?finnkode={self.ad_id}'
+        return f'https://www.finn.no/realestate/ownershiphistory.html?finnkode={self.finn_id}'
 
     def scrape_info(self):
         ad_scraper = Scraper(self.uri, "div", "grid__unit u-r-size2of3")
@@ -74,27 +66,28 @@ class Ad:
         # area and geographic information
         område = ad_scraper.body.find(
             "span", {"class": "u-t3 u-display-block"})
-        self.område = område.text if område else None
+        self.område = område.text.title() if område else None
         adresse = ad_scraper.body.find("p", {"class": "u-caption"})
         self.adresse = adresse.text.split(",")[0] if adresse else None
 
         # other info
-        self.boligtype = ad_scraper.get_value_for_label("Boligtype", "dl")
-        self.eieform = ad_scraper.get_value_for_label("Eieform")
-        self.soverom = ad_scraper.get_value_for_label("Soverom")
-        self.etasje = ad_scraper.get_value_for_label("Etasje")
-        self.primærrom = ad_scraper.get_value_for_label("Primærrom")
-        self.bruksareal = ad_scraper.get_value_for_label("Bruksareal")
-        self.energimerking = ad_scraper.get_value_for_label("Energimerking")
+        self.boligtype = ad_scraper.find_by_value("Boligtype", "dt")
+        self.eieform = ad_scraper.find_by_value("Eieform", "dt")
+        self.soverom = ad_scraper.find_by_value("Soverom", "dt")
+        self.etasje = ad_scraper.find_by_value("Etasje", "dt")
+        self.primærrom = ad_scraper.find_by_value("Primærrom", "dt")
+        self.bruksareal = ad_scraper.find_by_value("Bruksareal", "dt")
+        self.energimerking = ad_scraper.find_by_value("Energimerking", "dt")
+        self.solgt = ad_scraper.body.find("span", text="SOLGT") is not None
 
         # pricing
-        self.fellesgjeld = ad_scraper.get_value_for_label("Fellesgjeld")
-        self.omkostninger = ad_scraper.get_value_for_label("Omkostninger")
-        self.totalpris = ad_scraper.get_value_for_label("Totalpris")
-        self.felleskost_per_måned = ad_scraper.get_value_for_label(
-            "Felleskost/mnd.")
-        self.prisantydning = ad_scraper.get_value_for_label(
-            "Prisantydning", label_container_tag="div")
+        self.fellesgjeld = ad_scraper.find_by_value("Fellesgjeld", "dt")
+        self.omkostninger = ad_scraper.find_by_value("Omkostninger", "dt")
+        self.totalpris = ad_scraper.find_by_value("Totalpris", "dt")
+        self.felleskost_per_måned = ad_scraper.find_by_value(
+            "Felleskost/mnd.", "dt")
+        self.prisantydning = ad_scraper.find_by_value(
+            "Prisantydning", "span")
 
         # previous sales
         prev_sales_scraper = Scraper(self.get_prev_sales_uri(), "table")
@@ -135,7 +128,7 @@ class Ad:
             'Forrige salgsår': self.forrige_salg_år,
             'Forrige salgspris': self.forrige_salg_pris,
             'Bud': '',
-            'Solgt': '',
+            'Solgt': self.solgt,
             'Kommentar': ''
         }
 

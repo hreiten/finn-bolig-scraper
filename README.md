@@ -38,10 +38,12 @@ python main.py
 
 The program has the following flags implemented:
 
-| flag        | description                                                                                           | usage                                        |
-| ----------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| --uri       | to specify real estate URI after this flag. If not specified, user will be prompted to write the uri. | python main.py --uri www.finn/some-estate.no |
-| --no-google | ignores google sheets functionality                                                                   | python main.py --no-google                   |
+| flag        | description                                                                                  | usage                         |
+| ----------- | -------------------------------------------------------------------------------------------- | ----------------------------- |
+| --uri       | Specify real estate URI after this flag. If not specified, user will be prompted to type it. | --uri www.finn/some-estate.no |
+| --no-google | Ignores google sheets functionality, i.e. does not require usage of the google sheets API.   | --no-google                   |
+| --silent    | Silence all printing.                                                                        | --silent                      |
+| --update    | Update existing records in the spreadsheet (Refetch data)                                    | --update                      |
 
 All flags can be combined.
 
