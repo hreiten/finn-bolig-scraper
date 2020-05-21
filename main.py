@@ -4,7 +4,7 @@ from pprint import pprint
 import sys
 import requests
 
-GOOGLE_CREDENTIALS_JSON_PATH = "./creds.json"
+GOOGLE_CREDENTIALS_JSON_PATH = "./google_credentials.json"
 GOOGLE_SPREADSHEET_NAME = "Boligjakt"
 WORKSHEET_INDEX = 0
 
