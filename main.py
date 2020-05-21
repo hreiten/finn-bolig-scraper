@@ -18,9 +18,10 @@ def vprint(to_print, v=0, **args):
 def insert_row(worksheet, annonse, verbose=0):
     addresses = worksheet.col_values(1)[1:]
 
-    comment, bids = "", ""
+    comment, bids, vurdering = "", "", -1
     comment_column = worksheet.row_values(1).index("Kommentar")
     bids_column = worksheet.row_values(1).index("Bud")
+    vurdering_column = worksheet.row_values(1).index("Vurdering")
 
     if annonse.adresse in addresses:
         row = addresses.index(annonse.adresse) + 2
@@ -28,6 +29,7 @@ def insert_row(worksheet, annonse, verbose=0):
             f'⚠ Ad \"{annonse.adresse}\" already exists in row {row}. Deleting...', verbose, end='')
         comment = worksheet.cell(row, comment_column+1).value
         bids = worksheet.cell(row, bids_column+1).value
+        vurdering = worksheet.cell(row, vurdering_column+1).value
 
         worksheet.delete_rows(row)
         vprint(" ✔ deleted 1 row.", verbose)
@@ -38,6 +40,8 @@ def insert_row(worksheet, annonse, verbose=0):
         row_values[comment_column] = comment
     if bids != "":
         row_values[bids_column] = bids
+    if vurdering != -1:
+        row_values[vurdering_column] = vurdering
 
     return worksheet.insert_row(
         row_values, insert_at_row, "USER_ENTERED")
@@ -66,7 +70,7 @@ def update_existing_records(verbose=0):
     links = [fmt_link(ad[0]) for ad in worksheet.get_all_values(
         value_render_option="FORMULA")[1:] if len(ad[0]) > 0]
 
-    for finn_uri in tqdm(links, unit="finn_ad"):
+    for finn_uri in tqdm(links, unit="ad"):
         ad = Ad(finn_uri)
         push_ad_to_sheets(worksheet, ad, verbose)
 
@@ -78,7 +82,7 @@ def run():
     if "--update" in sys.argv:
         confirm = input(
             "> Are you sure you wish to update all records in the spreadsheet? [yes | no] ")
-        if confirm.lower() == "yes":
+        if confirm.lower() == "yes" or confirm.lower() == "y":
             update_existing_records(verbose=0)
         return
 

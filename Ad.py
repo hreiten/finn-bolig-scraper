@@ -50,6 +50,7 @@ class Ad:
     bud = None
     solgt = None
     finn_id = None
+    vurdering = None
     kommentar = ""
 
     def __init__(self, uri):
@@ -78,7 +79,8 @@ class Ad:
         self.primærrom = ad_scraper.find_by_value("Primærrom", "dt")
         self.bruksareal = ad_scraper.find_by_value("Bruksareal", "dt")
         self.energimerking = ad_scraper.find_by_value("Energimerking", "dt")
-        self.solgt = ad_scraper.body.find("span", text="SOLGT") is not None
+        self.solgt = "Ja" if ad_scraper.body.find(
+            "span", text="SOLGT") is not None else "Nei"
 
         # pricing
         self.fellesgjeld = ad_scraper.find_by_value("Fellesgjeld", "dt")
@@ -127,8 +129,11 @@ class Ad:
             'NOK/kvm': self.get_price_per_square_meter(),
             'Forrige salgsår': self.forrige_salg_år,
             'Forrige salgspris': self.forrige_salg_pris,
-            'Bud': '',
+            'Etasje': self.etasje,
+            'Energimerking': self.energimerking,
             'Solgt': self.solgt,
+            'Vurdering': self.vurdering,
+            'Bud': '',
             'Kommentar': ''
         }
 
