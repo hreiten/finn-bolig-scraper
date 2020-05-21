@@ -6,23 +6,36 @@ def fmt_value(value):
     value = value.replace(" m²", "")
     value = value.replace(" kr", "")
     value = value.replace("\xa0", "")
+    value = value.replace(",−", "")
 
     try:
-        return int(value)
+        return int(value.strip())
     except:
         return value.strip()
 
 
-def get_dict(html):
-    keys = [dt.text for dt in html.findAll("dt")]
-    values = [fmt_value(dd.text) for dd in html.findAll("dd")]
-    return dict(zip(keys, values))
+class Scraper:
 
+    def __init__(self, uri, body_tag="div", body_class=None):
+        self.uri = uri
+        page = requests.get(uri)
+        self.soup = bs(page.content, 'html.parser')
+        self.body = self.soup.find(
+            body_tag, {"class": body_class}) if body_class else self.soup.find(body_tag)
 
-def safe_ref(dictionary, key, default_return=None):
-    if key in dictionary.keys():
-        return dictionary[key]
-    return default_return
+    def get_value_for_label(self, label, label_container_tag="dl"):
+        for tags in self.body.findAll(label_container_tag):
+            found_label = tags.find(text=label) is not None
+
+            if found_label:
+                children = list(filter(lambda x: x != '\n', tags.children))
+                for i, child in enumerate(children):
+                    try:
+                        if child.text == label:
+                            return fmt_value(children[i+1].text)
+                            break
+                    except:
+                        continue
 
 
 class Ad:
@@ -40,9 +53,9 @@ class Ad:
     fellesgjeld = None
     omkostninger = None
     totalpris = None
-    felleskostnader_per_måned = None
-    forrige_salgsår = None
-    forrige_salgspris = None
+    felleskost_per_måned = None
+    forrige_salg_år = None
+    forrige_salg_pris = None
     bud = None
     solgt = None
     kommentar = ""
@@ -56,88 +69,54 @@ class Ad:
         return f'https://www.finn.no/realestate/ownershiphistory.html?finnkode={self.ad_id}'
 
     def scrape_info(self):
-        page = requests.get(self.uri)
-        soup = bs(page.content, 'html.parser')
+        ad_scraper = Scraper(self.uri, "div", "grid__unit u-r-size2of3")
 
-        main_container = soup.findAll("div", {"class": "grid"})[1]
-        sections = main_container.findAll("section", {"class": "panel"})
-        divs = main_container.findAll("div", {"class": "panel"})
+        # area and geographic information
+        område = ad_scraper.body.find(
+            "span", {"class": "u-t3 u-display-block"})
+        self.område = område.text if område else None
+        adresse = ad_scraper.body.find("p", {"class": "u-caption"})
+        self.adresse = adresse.text.split(",")[0] if adresse else None
 
-        ## Intro - area and address
-        intro = sections[1]
-        geography = {
-            "Område": intro.span.text.strip(),
-            "Adresse": intro.p.text.strip().split(",")[0]
-        }
+        # other info
+        self.boligtype = ad_scraper.get_value_for_label("Boligtype", "dl")
+        self.eieform = ad_scraper.get_value_for_label("Eieform")
+        self.soverom = ad_scraper.get_value_for_label("Soverom")
+        self.etasje = ad_scraper.get_value_for_label("Etasje")
+        self.primærrom = ad_scraper.get_value_for_label("Primærrom")
+        self.bruksareal = ad_scraper.get_value_for_label("Bruksareal")
+        self.energimerking = ad_scraper.get_value_for_label("Energimerking")
 
-        # Info - all other information except pricing
-        info_section = sections[2]
-        info = get_dict(info_section.dl)
-        # Pricing
-        pricing = divs[2]
-        pricing_dict = get_dict(pricing.findAll("dl")[1])
-        pricing_dict["Prisantydning"] = fmt_value(
-            pricing.find("span", {"class": "u-t3"}).text.strip())
+        # pricing
+        self.fellesgjeld = ad_scraper.get_value_for_label("Fellesgjeld")
+        self.omkostninger = ad_scraper.get_value_for_label("Omkostninger")
+        self.totalpris = ad_scraper.get_value_for_label("Totalpris")
+        self.felleskost_per_måned = ad_scraper.get_value_for_label(
+            "Felleskost/mnd.")
+        self.prisantydning = ad_scraper.get_value_for_label(
+            "Prisantydning", label_container_tag="div")
 
-        # Previous (most recent) sale
-        previous_sale_dict = {
-            "Forrige salgsår": "-",
-            "Forrige salgspris": "-"
-        }
-        prev_sales_uri = self.get_prev_sales_uri()
-        prev_sales_page = requests.get(prev_sales_uri)
-        prev_sales_soup = bs(prev_sales_page.content, 'html.parser')
-
-        table_contents = prev_sales_soup.table
-        if table_contents:
-            sale_year = int(table_contents.tbody.findAll(
-                "td", {"class": "plm"})[0].text.strip().split(".")[-1])
-            sale_price = table_contents.tbody.tr.findAll("td")[-1].text.strip()
-            sale_price = int(sale_price.replace("\xa0", "").replace(",−", ""))
-
-            previous_sale_dict["Forrige salgsår"] = sale_year
-            previous_sale_dict["Forrige salgspris"] = sale_price
-
-        # Finally, merge all the information to a single dict
-        merged = {
-            "Uri": self.uri,
-            **geography,
-            **info,
-            **pricing_dict,
-            **previous_sale_dict,
-        }
-
-        self.annonse_dict = merged
-
-        self.adresse = safe_ref(merged, "Adresse")
-        self.område = safe_ref(merged, "Område")
-
-        self.boligtype = safe_ref(merged, "Boligtype")
-        self.eieform = safe_ref(merged, "Eieform")
-        self.soverom = safe_ref(merged, "Soverom")
-        self.primærrom = safe_ref(merged, "Primærrom")
-        self.bruksareal = safe_ref(merged, "Bruksareal")
-        self.energimerking = safe_ref(merged, "Energimerking")
-        self.etasje = safe_ref(merged, "Etasje")
-
-        self.prisantydning = safe_ref(merged, "Prisantydning")
-        self.fellesgjeld = safe_ref(merged, "Fellesgjeld")
-        self.omkostninger = safe_ref(merged, "Omkostninger")
-        self.totalpris = safe_ref(merged, "Totalpris")
-        self.felleskostnader_per_måned = safe_ref(merged, "Felleskost/mnd.")
-
-        self.forrige_salgsår = safe_ref(merged, "Forrige salgsår")
-        self.forrige_salgspris = safe_ref(merged, "Forrige salgspris")
-
-    def html_to_dict(self, html_list):
-        labels = [label.text.strip() for label in html_list.findAll("dt")]
-        values = [fmt_value(value.text.strip())
-                  for value in html_list.findAll("dd")]
-
-        return dict(zip(labels, values))
+        # previous sales
+        prev_sales_scraper = Scraper(self.get_prev_sales_uri(), "table")
+        if prev_sales_scraper.body:
+            self.forrige_salg_år = fmt_value(prev_sales_scraper.body.tbody.find(
+                "td", {"class": "plm"}).text.strip().split(".")[-1])
+            self.forrige_salg_pris = fmt_value(
+                prev_sales_scraper.body.tbody.tr.findAll("td")[-1].text.strip())
 
     def get_price_per_square_meter(self):
-        return round((self.prisantydning + self.fellesgjeld) / self.primærrom, 0)
+        if not self.primærrom:
+            return None
+
+        ppsm = 0
+        if self.prisantydning:
+            ppsm += self.prisantydning
+        if self.fellesgjeld:
+            ppsm += self.fellesgjeld
+        if self.omkostninger:
+            ppsm += self.omkostninger
+
+        return round(ppsm/self.primærrom, 0)
 
     def to_link(self, to, text):
         return '=HYPERLINK(\"{}\";\"{}\")'.format(to, text)
@@ -150,11 +129,11 @@ class Ad:
             'Fellesgjeld': self.fellesgjeld,
             'Omkostninger': self.omkostninger,
             'Totalpris': self.totalpris,
-            'FK/mnd': self.felleskostnader_per_måned,
+            'FK/mnd': self.felleskost_per_måned,
             'Primærrom': self.primærrom,
             'NOK/kvm': self.get_price_per_square_meter(),
-            'Forrige salgsår': self.forrige_salgsår,
-            'Forrige salgspris': self.forrige_salgspris,
+            'Forrige salgsår': self.forrige_salg_år,
+            'Forrige salgspris': self.forrige_salg_pris,
             'Bud': '',
             'Solgt': '',
             'Kommentar': ''
