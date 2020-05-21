@@ -1,7 +1,12 @@
 from GoogleAuthenticator import authenticate
 from Ad import Ad
+from pprint import pprint
 import sys
 import requests
+
+GOOGLE_CREDENTIALS_JSON_PATH = "./creds.json"
+GOOGLE_SPREADSHEET_NAME = "Boligjakt"
+WORKSHEET_INDEX = 0
 
 
 def insert_row(worksheet, annonse):
@@ -17,8 +22,8 @@ def insert_row(worksheet, annonse):
 
 
 def push_ad_to_sheets(client, ad):
-    sheet_index = 0 if ad.soverom == 3 else 1
-    worksheet = client.open("Boligjakt").get_worksheet(sheet_index)
+    worksheet = client.open(
+        GOOGLE_SPREADSHEET_NAME).get_worksheet(WORKSHEET_INDEX)
     return insert_row(worksheet, ad)
 
 
@@ -29,18 +34,27 @@ def ping_uri(uri):
         raise ValueError(
             f"Received invalid response (code: {ping}) from URI: {uri}")
     else:
-        print(f"✔ The URL responded with status code {ping}.")
+        print(f"✔ The URI responded with status code {ping}.")
 
 
 def run():
 
-    uri = input("> Finn URI: ")
-    ping_uri(uri)
-    client = authenticate()
+    if ("--uri" in sys.argv):
+        uri = sys.argv[sys.argv.index("--uri")+1]
+    else:
+        uri = input("> Finn URI: ")
 
-    result = push_ad_to_sheets(client, Ad(uri))
-    print(
-        f"✔ Success! Ad pushed to the spreadsheet ({result['updatedCells']} affected cells)")
+    ping_uri(uri)
+
+    ad = Ad(uri)
+
+    if ("--no-google" in sys.argv):
+        pprint(ad.get_sheet_dict())
+    else:
+        client = authenticate(json_path=GOOGLE_CREDENTIALS_JSON_PATH)
+        result = push_ad_to_sheets(client, ad)
+        print(
+            f"✔ Success! Ad pushed to the spreadsheet ({result['updatedCells']} affected cells)")
 
 
 if __name__ == "__main__":
