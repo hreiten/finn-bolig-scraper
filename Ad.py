@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup as bs
 import requests
+import datetime
 
 
 def safe_get_from_dict(dictionary, key):
@@ -156,7 +157,7 @@ class Ad:
         if ad_already_in_sheet:
             ad_row = addresses.index(self.adresse) + 2
             keep_columns = ["Vurdering", "Max bud",
-                            "Kommentar", "Påmeldt budrunde"]
+                            "Kommentar", "Påmeldt budrunde", "Lagt til"]
             for col_name in keep_columns:
                 if col_name in headers:
                     col_value = worksheet.cell(
@@ -165,6 +166,8 @@ class Ad:
 
             # delete the row
             worksheet.delete_rows(ad_row)
+        else:
+            d["Lagt til"] = datetime.datetime.now().strftime("%d.%m.%Y")
 
         # push to google worksheet
         return worksheet.append_row(list(d.values()), "USER_ENTERED")
