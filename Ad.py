@@ -2,6 +2,10 @@ from bs4 import BeautifulSoup as bs
 import requests
 
 
+def safe_get_from_dict(dictionary, key):
+    return dictionary[key] if key in dictionary.keys() else None
+
+
 def fmt_value(value):
     value = value.replace(" m²", "")
     value = value.replace(" kr", "")
@@ -30,7 +34,6 @@ class Scraper:
 
 
 class Ad:
-    annonse_dict = None
     adresse = None
     område = None
     boligtype = None
@@ -47,11 +50,8 @@ class Ad:
     felleskost_per_måned = None
     forrige_salg_år = None
     forrige_salg_pris = None
-    bud = None
     solgt = None
     finn_id = None
-    vurdering = None
-    kommentar = ""
 
     def __init__(self, uri):
         self.uri = uri
@@ -116,26 +116,54 @@ class Ad:
     def to_link(self, to, text):
         return '=HYPERLINK(\"{}\";\"{}\")'.format(to, text)
 
-    def get_sheet_dict(self):
+    # the keys in this dict must correspond to the headers in the worksheet, but order is not important.
+    def get_values_dict(self):
         return {
             'Adresse': self.to_link(self.uri, self.adresse),
             'Område': self.område,
+            'Boligtype': self.boligtype,
+            'Eieform': self.eieform,
+            'Soverom': self.soverom,
+            'Primærrom': self.primærrom,
+            'Bruksareal': self.bruksareal,
+            'Etasje': self.etasje,
+            'Energimerking': self.energimerking,
             'Prisantydning': self.prisantydning,
             'Fellesgjeld': self.fellesgjeld,
             'Omkostninger': self.omkostninger,
             'Totalpris': self.totalpris,
             'FK/mnd': self.felleskost_per_måned,
-            'Primærrom': self.primærrom,
             'NOK/kvm': self.get_price_per_square_meter(),
             'Forrige salgsår': self.forrige_salg_år,
             'Forrige salgspris': self.forrige_salg_pris,
-            'Etasje': self.etasje,
-            'Energimerking': self.energimerking,
-            'Solgt': self.solgt,
-            'Vurdering': self.vurdering,
-            'Bud': '',
-            'Kommentar': ''
+            'Solgt': self.solgt
         }
 
-    def get_sheet_values(self):
-        return list(self.get_sheet_dict().values())
+    def push_to_worksheet(self, worksheet):
+        insert_at_row = len(worksheet.col_values(1)) + 1
+        headers = worksheet.row_values(1)
+        d = dict.fromkeys(headers)
+        ad_dict = self.get_values_dict()
+
+        # populate the dictionary
+        for header in d.keys():
+            d[header] = safe_get_from_dict(ad_dict, header)
+
+        # keep "manual" data, e.g. user comments, that is not scraped
+        addresses = worksheet.col_values(1)[1:]
+        ad_already_in_sheet = self.adresse in addresses
+        if ad_already_in_sheet:
+            ad_row = addresses.index(self.adresse) + 2
+            keep_columns = ["Vurdering", "Max bud",
+                            "Kommentar", "Påmeldt budrunde"]
+            for col_name in keep_columns:
+                if col_name in headers:
+                    col_value = worksheet.cell(
+                        ad_row, headers.index(col_name)+1).value
+                    d[col_name] = col_value
+
+            # delete the row
+            worksheet.delete_rows(ad_row)
+
+        # push to google worksheet
+        return worksheet.append_row(list(d.values()), "USER_ENTERED")

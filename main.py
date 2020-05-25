@@ -15,42 +15,6 @@ def vprint(to_print, v=0, **args):
         print(to_print, **args)
 
 
-def insert_row(worksheet, annonse, verbose=0):
-    addresses = worksheet.col_values(1)[1:]
-
-    comment, bids, vurdering = "", "", -1
-    comment_column = worksheet.row_values(1).index("Kommentar")
-    bids_column = worksheet.row_values(1).index("Bud")
-    vurdering_column = worksheet.row_values(1).index("Vurdering")
-
-    if annonse.adresse in addresses:
-        row = addresses.index(annonse.adresse) + 2
-        vprint(
-            f'⚠ Ad \"{annonse.adresse}\" already exists in row {row}. Deleting...', verbose, end='')
-        comment = worksheet.cell(row, comment_column+1).value
-        bids = worksheet.cell(row, bids_column+1).value
-        vurdering = worksheet.cell(row, vurdering_column+1).value
-
-        worksheet.delete_rows(row)
-        vprint(" ✔ deleted 1 row.", verbose)
-
-    insert_at_row = len(worksheet.col_values(1)) + 1
-    row_values = annonse.get_sheet_values()
-    if comment != "":
-        row_values[comment_column] = comment
-    if bids != "":
-        row_values[bids_column] = bids
-    if vurdering != -1:
-        row_values[vurdering_column] = vurdering
-
-    return worksheet.insert_row(
-        row_values, insert_at_row, "USER_ENTERED")
-
-
-def push_ad_to_sheets(worksheet, ad, verbose=0):
-    return insert_row(worksheet, ad, verbose)
-
-
 def ping_uri(uri, verbose=0):
     ping = requests.get(uri).status_code
 
@@ -72,7 +36,7 @@ def update_existing_records(verbose=0):
 
     for finn_uri in tqdm(links, unit="ad"):
         ad = Ad(finn_uri)
-        push_ad_to_sheets(worksheet, ad, verbose)
+        ad.push_to_worksheet(worksheet)
 
 
 def run():
@@ -97,15 +61,16 @@ def run():
 
     if ("--no-google" in sys.argv):
         print(f"Data for URI {uri}")
-        pprint(ad.get_sheet_dict())
+        pprint(ad.get_values_dict())
         return
 
     client = authenticate(json_path=GOOGLE_CREDENTIALS_JSON_PATH)
     worksheet = client.open(
         GOOGLE_SPREADSHEET_NAME).get_worksheet(WORKSHEET_INDEX)
-    result = push_ad_to_sheets(worksheet, ad, verbose)
+
+    ad.push_to_worksheet(worksheet)
     vprint(
-        f"✔ Success! Ad pushed to the spreadsheet ({result['updatedCells']} affected cells)", verbose)
+        f"✔ Success! Ad \"{ad.adresse}\" pushed to the spreadsheet.", verbose)
 
 
 if __name__ == "__main__":
