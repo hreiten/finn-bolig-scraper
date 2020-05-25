@@ -50,7 +50,7 @@ class Ad:
     felleskost_per_måned = None
     forrige_salg_år = None
     forrige_salg_pris = None
-    solgt = None
+    status = None
     finn_id = None
 
     def __init__(self, uri):
@@ -79,8 +79,9 @@ class Ad:
         self.primærrom = ad_scraper.find_by_value("Primærrom", "dt")
         self.bruksareal = ad_scraper.find_by_value("Bruksareal", "dt")
         self.energimerking = ad_scraper.find_by_value("Energimerking", "dt")
-        self.solgt = "Ja" if ad_scraper.body.find(
-            "span", text="SOLGT") is not None else "Nei"
+        status = ad_scraper.body.find("span", {"class": "status"})
+        if status:
+            self.status = status.text.title()
 
         # pricing
         self.fellesgjeld = ad_scraper.find_by_value("Fellesgjeld", "dt")
@@ -136,7 +137,7 @@ class Ad:
             'NOK/kvm': self.get_price_per_square_meter(),
             'Forrige salgsår': self.forrige_salg_år,
             'Forrige salgspris': self.forrige_salg_pris,
-            'Solgt': self.solgt
+            'Status': self.status
         }
 
     def push_to_worksheet(self, worksheet):
