@@ -141,7 +141,7 @@ class Ad:
             'Status': self.status
         }
 
-    def push_to_worksheet(self, worksheet):
+    def push_to_worksheet(self, worksheet, arg_dict={}):
         insert_at_row = len(worksheet.col_values(1)) + 1
         headers = worksheet.row_values(1)
         d = dict.fromkeys(headers)
@@ -164,10 +164,19 @@ class Ad:
                         ad_row, headers.index(col_name)+1).value
                     d[col_name] = col_value
 
+            if len(arg_dict) > 0:
+                for key, value in arg_dict.items():
+                    if key in d.keys() and value:
+                        d[key] = value
+
             # delete the row
             worksheet.delete_rows(ad_row)
         else:
             d["Lagt til"] = datetime.datetime.now().strftime("%d.%m.%Y")
+
+            for key, value in arg_dict.items():
+                if key in d.keys() and value:
+                    d[key] = value
 
         # push to google worksheet
         return worksheet.append_row(list(d.values()), "USER_ENTERED")
