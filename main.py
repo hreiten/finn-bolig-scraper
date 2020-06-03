@@ -66,7 +66,7 @@ def update_existing_records(verbose=0):
         }
         dicts.append(sheet_dict)
 
-    vprint(f"Writing ${len(dicts)} to google sheets...", verbose)
+    vprint(f"Updating {len(dicts)} ads to google sheets...", verbose)
     return worksheet.batch_update(dicts, value_input_option="USER_ENTERED")
 
 
