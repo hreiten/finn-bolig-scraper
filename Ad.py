@@ -19,6 +19,15 @@ def fmt_value(value):
         return value.strip()
 
 
+def to_date(text_date):
+    months = ["januar", "februar", "mars", "april", "mai", "juni",
+              "juli", "august", "september", "oktober", "november", "desember"]
+
+    day, text_month = text_date.split(". ")
+    month = months.index(text_month.lower().strip()) + 1
+    return int(day), month
+
+
 class Scraper:
 
     def __init__(self, uri, body_tag="div", body_class=None):
@@ -53,6 +62,7 @@ class Ad:
     forrige_salg_pris = None
     status = None
     finn_id = None
+    visning = None
 
     def __init__(self, uri):
         self.uri = uri
@@ -83,6 +93,18 @@ class Ad:
         status = ad_scraper.body.find("span", {"class": "status"})
         if status:
             self.status = status.text.title()
+
+        # last visning
+        visning_div = ad_scraper.body.find("h2", text="Visning")
+        if visning_div:
+            p = visning_div.parent
+            visninger = [i.text.strip() for i in p.find_all("dd")]
+            if len(visninger) >= 2:
+                last_visning = visninger[-2:]
+                visning_day, visning_month = to_date(last_visning[0])
+
+                if visning_day and visning_month:
+                    self.visning = f"{visning_day}.{visning_month}.2020"
 
         # pricing
         self.fellesgjeld = ad_scraper.find_by_value("Fellesgjeld", "dt")
@@ -148,7 +170,8 @@ class Ad:
             'NOK/kvm': self.get_price_per_square_meter(),
             'Forrige salgsår': self.forrige_salg_år,
             'Forrige salgspris': self.forrige_salg_pris,
-            'Status': self.status
+            'Status': self.status,
+            'Visning': self.visning
         }
 
     def get_sheet_dict(self, worksheet, headers=None, addresses=None, arg_dict={}):
@@ -163,7 +186,7 @@ class Ad:
         for key in sheet_dict:
             sheet_dict[key] = safe_get_from_dict(ad_dict, key)
 
-        # keep "manual" data, e.g. user comments, that is not scraped
+        # keep "manual" data that is not scraped, e.g. user comments
         ad_row = self.get_row_in_sheet(addresses, worksheet)
         if ad_row >= 0:
             ad_data = worksheet.row_values(ad_row)
@@ -177,6 +200,14 @@ class Ad:
             for col_name in keep_columns:
                 if col_name in headers:
                     sheet_dict[col_name] = ad_data[headers.index(col_name)]
+
+            # save visningdato
+            ad_has_visning_info_in_sheet = ad_data[headers.index(
+                "Visning")] != ''
+            scraped_visning_info_is_none = sheet_dict["Visning"] is None
+            if ad_has_visning_info_in_sheet and scraped_visning_info_is_none:
+                # then store existing visning info rather than None
+                sheet_dict["Visning"] = ad_data[headers.index("Visning")]
 
         else:
             sheet_dict["Lagt til"] = datetime.datetime.now().strftime(
